@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FiberTaskingLibExamples", "FiberTaskingLibExamples.vcxproj", "{881D771E-4AC8-4017-BAD1-FFD42DC5618F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FiberTaskingLib", "..\libs\fiber_tasking_lib\project_files\FiberTaskingLib.vcxproj", "{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Debug|x64.ActiveCfg = Debug|x64
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Debug|x64.Build.0 = Debug|x64
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Debug|x86.ActiveCfg = Debug|Win32
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Debug|x86.Build.0 = Debug|Win32
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Release|x64.ActiveCfg = Release|x64
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Release|x64.Build.0 = Release|x64
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Release|x86.ActiveCfg = Release|Win32
+		{881D771E-4AC8-4017-BAD1-FFD42DC5618F}.Release|x86.Build.0 = Release|Win32
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Debug|x64.ActiveCfg = Debug|x64
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Debug|x64.Build.0 = Debug|x64
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Debug|x86.ActiveCfg = Debug|Win32
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Debug|x86.Build.0 = Debug|Win32
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Release|x64.ActiveCfg = Release|x64
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Release|x64.Build.0 = Release|x64
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Release|x86.ActiveCfg = Release|Win32
+		{A9751C33-878C-43EE-AF0B-F77F50FC2DD6}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
