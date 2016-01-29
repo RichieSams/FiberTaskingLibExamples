@@ -1,6 +1,6 @@
-[submodule "libs/fiber_tasking_lib"]
-	path = libs/fiber_tasking_lib
-	url = git@github.com:RichieSams/FiberTaskingLib.git
-[submodule "libs/remotery"]
-	path = libs/remotery
-	url = git@github.com:Celtoys/Remotery.git
+[submodule "third_party/fiber_tasking_lib"]
+	path = third_party/fiber_tasking_lib
+	url = https://github.com/RichieSams/FiberTaskingLib.git
+[submodule "third_party/remotery"]
+	path = third_party/remotery
+	url = https://github.com/Celtoys/Remotery.git
