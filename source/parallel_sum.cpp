@@ -43,19 +43,11 @@ TASK_ENTRY_POINT(AddNumberSubset) {
 
 
 
-const uint64 runs = 1024ull * 1024ull;
-const uint64 triangleNum = 10ull * 1024ull * 1024ull;
-const uint64 numAdditionsPerTask = 100000ull;
-const uint64 numTasks = (triangleNum + numAdditionsPerTask - 1ull) / numAdditionsPerTask;
-
-
-int main(int argc, char *argv) {
-	Remotery *rmt;
-	rmt_CreateGlobalInstance(&rmt);
-
-
-	FiberTaskingLib::TaskScheduler *taskScheduler = new FiberTaskingLib::TaskScheduler();
-	taskScheduler->Initialize(110);
+TASK_ENTRY_POINT(mainTask) {
+	const uint64 runs = 1024ull;
+	const uint64 triangleNum = 10ull * 1024ull * 1024ull;
+	const uint64 numAdditionsPerTask = 100000ull;
+	const uint64 numTasks = (triangleNum + numAdditionsPerTask - 1ull) / numAdditionsPerTask;
 
 	for (uint run = 0; run < runs; ++run) {
 		// Create the tasks
@@ -73,16 +65,16 @@ int main(int argc, char *argv) {
 				subset->end = triangleNum;
 			}
 
-			tasks[i] = {AddNumberSubset, subset};
+			tasks[i] = { AddNumberSubset, subset };
 
 			nextNumber = subset->end + 1;
 		}
 
 		// Schedule the tasks and wait for them to complete
-		std::shared_ptr<FiberTaskingLib::AtomicCounter> counter = taskScheduler->AddTasks(numTasks, tasks);
+		std::shared_ptr<std::atomic_uint> counter = g_taskScheduler->AddTasks(numTasks, tasks);
 		delete[] tasks;
 
-		taskScheduler->WaitForCounter(counter, 0);
+		g_taskScheduler->WaitForCounter(counter, 0);
 
 		// Add the results
 		uint64 result = 0ull;
@@ -93,15 +85,26 @@ int main(int argc, char *argv) {
 		delete[] subsets;
 
 		// Sleep
+		rmt_BeginCPUSample(BUFFER);
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		rmt_EndCPUSample();
 	}
+}
 
+
+
+
+
+int main(int argc, char *argv) {
+	Remotery *rmt;
+	rmt_CreateGlobalInstance(&rmt);
+	rmt_SetCurrentThreadName("Main");
+
+	FiberTaskingLib::TaskScheduler taskScheduler;
+	taskScheduler.Run(200, mainTask);
 
 	// Cleanup
-	taskScheduler->Quit();
 	rmt_DestroyGlobalInstance(rmt);
-
-	delete taskScheduler;
 
 	return 0;
 }
