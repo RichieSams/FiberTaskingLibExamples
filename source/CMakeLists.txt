@@ -1,1 +1,2 @@
 add_subdirectory(simple_game)
+add_subdirectory(parallel_sum)
