@@ -9,7 +9,7 @@ set( GLFW_INSTALL OFF CACHE BOOL  "GLFW lib only" )
 add_subdirectory(glfw)
 
 set( FTL_BUILD_TESTS OFF CACHE BOOL  "FTL lib only" )
-add_subdirectory(fiber_tasking_lib)
+add_subdirectory(FiberTaskingLib)
 
 add_subdirectory(glad)
 
