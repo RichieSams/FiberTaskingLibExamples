@@ -1,11 +1,12 @@
 /* FiberTaskingLibExamples
-*
-* This is a set of examples to accompany the FiberTaskingLib
-* https://github.com/RichieSams/FiberTaskingLib
-*
-* FiberTaskingLibExamples is the legal property of Adrian Astley
-* Copyright Adrian Astley 2016
-*/
+ *
+ * This is a set of examples to accompany the FiberTaskingLib
+ * https://github.com/RichieSams/FiberTaskingLib
+ *
+ * FiberTaskingLibExamples is the legal property of Adrian Astley
+ * Copyright Adrian Astley 2016
+ */
+
 
 #include "renderer/renderer.h"
 
