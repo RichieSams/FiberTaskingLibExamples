@@ -18,3 +18,5 @@ add_subdirectory(stb)
 add_subdirectory(glm)
 
 add_subdirectory(MemoryLib)
+
+add_subdirectory(Remotery)
