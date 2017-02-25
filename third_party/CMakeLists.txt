@@ -16,3 +16,5 @@ add_subdirectory(glad)
 add_subdirectory(stb)
 
 add_subdirectory(glm)
+
+add_subdirectory(MemoryLib)
