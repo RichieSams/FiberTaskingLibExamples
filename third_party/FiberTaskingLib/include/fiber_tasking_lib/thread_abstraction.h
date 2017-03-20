@@ -15,6 +15,7 @@
 #include "fiber_tasking_lib/config.h"
 
 #include <cassert>
+#include <thread>
 
 
 #if defined(FTL_WIN32_THREADS)
@@ -106,17 +107,6 @@ inline void EndCurrentThread() {
 */
 inline void JoinThread(ThreadType thread) {
 	WaitForSingleObject(thread.Handle, INFINITE);
-}
-
-/**
- * Get the number of hardware threads. This should take Hyperthreading, etc. into account
- *
- * @return    An number of hardware threads
- */
-inline uint GetNumHardwareThreads() {
-	SYSTEM_INFO sysInfo;
-	GetSystemInfo(&sysInfo);
-	return sysInfo.dwNumberOfProcessors;
 }
 
 /**
@@ -255,8 +245,8 @@ inline bool CreateThread(uint stackSize, ThreadStartRoutine startRoutine, void *
 	// Set stack size
 	pthread_attr_setstacksize(&threadAttr, stackSize);
 
-	// TODO: OSX Thread Affinity
-	#if !defined(FTL_OS_MAC) && !defined(FTL_OS_iOS)
+	// TODO: OSX and MinGW Thread Affinity
+	#if defined(FTL_OS_LINUX)
 		// Set core affinity
 		cpu_set_t cpuSet;
 		CPU_ZERO(&cpuSet);
@@ -287,15 +277,6 @@ inline void JoinThread(ThreadType thread) {
 }
 
 /**
-* Get the number of hardware threads. This should take Hyperthreading, etc. into account
-*
-* @return    An number of hardware threads
-*/
-inline uint GetNumHardwareThreads() {
-	return (uint)sysconf(_SC_NPROCESSORS_ONLN);
-}
-
-/**
 * Get the current thread
 *
 * @return    The current thread
@@ -310,8 +291,8 @@ inline ThreadType GetCurrentThread() {
 * @param coreAffinity    The requested core affinity
 */
 inline void SetCurrentThreadAffinity(size_t coreAffinity) {
-	// TODO: OSX Thread Affinity
-	#ifdef FTL_OS_LINUX
+	// TODO: OSX and MinGW Thread Affinity
+	#if defined(FTL_OS_LINUX)
 		cpu_set_t cpuSet;
 		CPU_ZERO(&cpuSet);
 		CPU_SET(coreAffinity, &cpuSet);
@@ -377,3 +358,17 @@ inline void SignalEvent(EventType eventId) {
 #else
 	#error No Thread library found
 #endif
+
+
+namespace FiberTaskingLib {
+	
+/**
+* Get the number of hardware threads. This should take Hyperthreading, etc. into account
+*
+* @return    An number of hardware threads
+*/
+inline uint GetNumHardwareThreads() {
+	return std::thread::hardware_concurrency();
+}
+	
+} // End of namespace FiberTaskingLib
