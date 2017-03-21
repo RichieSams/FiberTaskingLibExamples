@@ -10,76 +10,54 @@
 
 #include "renderer/renderer.h"
 
+#include "logic/logic.h"
+#include "logic/game_sync_state.h"
+
+#include <remotery/remotery.h>
+
 #include <GLFW/glfw3.h>
+#include <fiber_tasking_lib/task_scheduler.h>
 
-
-void Update();
 
 int main(const int argc, const char **argv) {
-	GLFWwindow *window = InitOpenGL(1280, 720, "FiberTaskingLib Examples - Simple Game");
-	RenderContext *context;
-	InitRenderContext(window, &context);
+	GLFWwindow *window = CreateGLFWWindow(1280, 720, "FiberTaskingLib Examples - Simple Game");
+	GameSyncState *syncState = new GameSyncState();
+	Remotery *rmt;
+	rmt_CreateGlobalInstance(&rmt);
 	
-	// Main loop
-	glfwSetTime(0.0);
-	double accumulatedTime = 0.0;
-	double updatePeriod = 0.030;
+	// Start the render thread
+	ThreadArgs *renderArgs = new ThreadArgs;
+	renderArgs->Window = window;
+	renderArgs->SyncState = syncState;
 
-	// Loop until there is a quit message from the window or the user.
-	while (!glfwWindowShouldClose(window)) {
-		// Check for events
-		glfwPollEvents();
-
-		// Otherwise do the frame processing
-		double deltaTime = glfwGetTime();
-		// Avoid spiral of death
-		if (deltaTime > 250.0) {
-			deltaTime = 250.0;
-		}
-		accumulatedTime += deltaTime;
-
-		while (accumulatedTime >= updatePeriod) {
-			accumulatedTime -= updatePeriod;
-			Update();
-		}
-
-		RenderFrame(window, context, deltaTime);
+	FiberTaskingLib::ThreadType renderThread;
+	if (!FiberTaskingLib::CreateThread(1048576, RenderThreadStart, renderArgs, 0, &renderThread)) {
+		printf("Failed to start the render system");
 	}
 
-	//// Handle events
-	//if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE)) {
-	//	glfwSetWindowShouldClose(window, 1);
-	//}
+	
 
-	//// WASD keyboard movement
-	//const float cameraMoveSpeed = 0.01f;
-	//if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_W)) { bodyTranslation += Vector3(headToWorldMatrix * Vector4(0, 0, -cameraMoveSpeed, 0)); }
-	//if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_S)) { bodyTranslation += Vector3(headToWorldMatrix * Vector4(0, 0, +cameraMoveSpeed, 0)); }
-	//if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_A)) { bodyTranslation += Vector3(headToWorldMatrix * Vector4(-cameraMoveSpeed, 0, 0, 0)); }
-	//if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_D)) { bodyTranslation += Vector3(headToWorldMatrix * Vector4(+cameraMoveSpeed, 0, 0, 0)); }
-	//if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_C)) { bodyTranslation.y -= cameraMoveSpeed; }
-	//if ((GLFW_PRESS == glfwGetKey(window, GLFW_KEY_SPACE)) || (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_Z))) { bodyTranslation.y += cameraMoveSpeed; }
+	// Begin the logic loop
+	rmt_SetCurrentThreadName("Main");
+	FiberTaskingLib::TaskScheduler taskScheduler;
 
-	//// Keep the camera above the ground
-	//if (bodyTranslation.y < 0.01f) { bodyTranslation.y = 0.01f; }
+	ThreadArgs *logicArgs = new ThreadArgs;
+	logicArgs->Window = window;
+	logicArgs->SyncState = syncState;
 
-	//static bool inDrag = false;
-	//const float cameraTurnSpeed = 0.005f;
-	//if (GLFW_PRESS == glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)) {
-	//	static double startX, startY;
-	//	double currentX, currentY;
+	// This will block until we're ready to quit
+	taskScheduler.Run(512, LogicMain, logicArgs, FiberTaskingLib::GetNumHardwareThreads() - 1);
 
-	//	glfwGetCursorPos(window, &currentX, &currentY);
-	//	if (inDrag) {
-	//		bodyRotation.y -= float(currentX - startX) * cameraTurnSpeed;
-	//		bodyRotation.x -= float(currentY - startY) * cameraTurnSpeed;
-	//	}
-	//	inDrag = true; startX = currentX; startY = currentY;
-	//} else {
-	//	inDrag = false;
-	//}
 
-	// Close the GL context and release all resources
+	// Signal the render thread to terminate
+	syncState->ShouldQuit.store(true);
+	// Push a new scene to make sure the render thread doesn't deadlock
+	syncState->SceneQueue.Push(0);
+
+	// Wait for them to clean up
+	FiberTaskingLib::JoinThread(renderThread);
+
+	// Quit
 	glfwTerminate();
 
 	return 0;
@@ -87,6 +65,4 @@ int main(const int argc, const char **argv) {
 
 
 
-void Update() {
-	
-}
+

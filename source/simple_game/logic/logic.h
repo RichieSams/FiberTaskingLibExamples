@@ -9,12 +9,7 @@
 
 #pragma once
 
-#include <fiber_tasking_lib/thread_abstraction.h>
+#include <fiber_tasking_lib/task.h>
 
 
-struct RenderContext;
-struct GLFWwindow;
-
-GLFWwindow *CreateGLFWWindow(int width, int height, const char *title);
-
-FTL_THREAD_FUNC_DECL RenderThreadStart(void *arg);
+FTL_TASK_ENTRY_POINT(LogicMain);

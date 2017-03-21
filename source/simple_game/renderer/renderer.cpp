@@ -9,9 +9,13 @@
 
 #include "renderer/renderer.h"
 
+#include "logic/game_sync_state.h"
+
 #include <glad/glad.h>
 
 #include <GLFW/glfw3.h>
+
+#include <remotery/remotery.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
@@ -67,7 +71,7 @@ struct RenderContext {
 	GLuint SkyVAO;
 };
 
-GLFWwindow *InitOpenGL(int width, int height, const char *title) {
+GLFWwindow *CreateGLFWWindow(int width, int height, const char *title) {
 	if (!glfwInit()) {
 		std::fprintf(stderr, "ERROR: Could not start GLFW\n");
 		std::exit(1);
@@ -97,12 +101,6 @@ GLFWwindow *InitOpenGL(int width, int height, const char *title) {
 		std::exit(1);
 	}
 
-	// Clear startup errors
-	while (glGetError() != GL_NONE) {
-	}
-
-	glfwSwapInterval(0);
-
 	std::fprintf(stderr, "GPU: %s (OpenGL version %s)\n", (char *)glGetString(GL_RENDERER), (char *)glGetString(GL_VERSION));
 
 	// Check for errors
@@ -111,8 +109,12 @@ GLFWwindow *InitOpenGL(int width, int height, const char *title) {
 		assert(error == GL_NONE);
 	}
 
+	glfwMakeContextCurrent(nullptr);
+
 	return window;
 }
+
+
 
 GLuint createShaderProgram(GLuint vertexShader, GLuint pixelShader) {
 	GLuint program = glCreateProgram();
@@ -182,16 +184,18 @@ std::string loadTextFile(const char *filename) {
 	return buffer.str();
 }
 
-void InitRenderContext(GLFWwindow *window, RenderContext **context) {
-	RenderContext *newContext = *context = new RenderContext();
+void InitRenderContext(GLFWwindow *window, RenderContext *context) {
+	glfwMakeContextCurrent(window);
 
-	glfwGetFramebufferSize(window, &newContext->FrameWidth, &newContext->FrameHeight);
-	glViewport(0, 0, newContext->FrameWidth, newContext->FrameHeight);
+	glfwSwapInterval(1);
+
+	glfwGetFramebufferSize(window, &context->FrameWidth, &context->FrameHeight);
+	glViewport(0, 0, context->FrameWidth, context->FrameHeight);
 
 	GLuint colorRenderTarget;
 	GLuint depthRenderTarget;
 
-	glGenFramebuffers(1, &newContext->Framebuffer);
+	glGenFramebuffers(1, &context->Framebuffer);
 	glGenTextures(1, &colorRenderTarget);
 	glGenTextures(1, &depthRenderTarget);
 
@@ -200,16 +204,16 @@ void InitRenderContext(GLFWwindow *window, RenderContext **context) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, newContext->FrameWidth, newContext->FrameHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, context->FrameWidth, context->FrameHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
 	glBindTexture(GL_TEXTURE_2D, depthRenderTarget);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, newContext->FrameWidth, newContext->FrameHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, context->FrameWidth, context->FrameHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, newContext->Framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, context->Framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorRenderTarget, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthRenderTarget, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -242,33 +246,33 @@ void InitRenderContext(GLFWwindow *window, RenderContext **context) {
 	glGenBuffers(1, &indexBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Cube::index), Cube::index, GL_STATIC_DRAW);
-	newContext->NumIndices = sizeof(Cube::index) / sizeof(Cube::index[0]);
+	context->NumIndices = sizeof(Cube::index) / sizeof(Cube::index[0]);
 
 
 	// Create the main shader
 	GLuint mainVertexShader = compileShader(GL_VERTEX_SHADER, loadTextFile("main_vs.glsl"));
 	GLuint mainPixelShader = compileShader(GL_FRAGMENT_SHADER, loadTextFile("main_ps.glsl"));
-	newContext->MainShader = createShaderProgram(mainVertexShader, mainPixelShader);
+	context->MainShader = createShaderProgram(mainVertexShader, mainPixelShader);
 
 	// Binding points for attributes and uniforms discovered from the shader
-	const GLint positionAttribute = glGetAttribLocation(newContext->MainShader, "position");
-	const GLint normalAttribute = glGetAttribLocation(newContext->MainShader, "normal");
-	const GLint texCoordAttribute = glGetAttribLocation(newContext->MainShader, "texCoord");
-	const GLint tangentAttribute = glGetAttribLocation(newContext->MainShader, "tangent");
-	newContext->MainShaderProperties.ColorTextureUniform = glGetUniformLocation(newContext->MainShader, "colorTexture");
+	const GLint positionAttribute = glGetAttribLocation(context->MainShader, "position");
+	const GLint normalAttribute = glGetAttribLocation(context->MainShader, "normal");
+	const GLint texCoordAttribute = glGetAttribLocation(context->MainShader, "texCoord");
+	const GLint tangentAttribute = glGetAttribLocation(context->MainShader, "tangent");
+	context->MainShaderProperties.ColorTextureUniform = glGetUniformLocation(context->MainShader, "colorTexture");
 
-	const GLuint uniformBlockIndex = glGetUniformBlockIndex(newContext->MainShader, "Uniform");
+	const GLuint uniformBlockIndex = glGetUniformBlockIndex(context->MainShader, "Uniform");
 
-	newContext->MainShaderProperties.UniformBindingPoint = 1;
-	glUniformBlockBinding(newContext->MainShader, uniformBlockIndex, newContext->MainShaderProperties.UniformBindingPoint);
+	context->MainShaderProperties.UniformBindingPoint = 1;
+	glUniformBlockBinding(context->MainShader, uniformBlockIndex, context->MainShaderProperties.UniformBindingPoint);
 
-	glGenBuffers(1, &newContext->MainShaderProperties.UniformBlock);
+	glGenBuffers(1, &context->MainShaderProperties.UniformBlock);
 
 	{
 		// Allocate space for the uniform block buffer
 		GLint uniformBlockSize;
-		glGetActiveUniformBlockiv(newContext->MainShader, uniformBlockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &uniformBlockSize);
-		glBindBuffer(GL_UNIFORM_BUFFER, newContext->MainShaderProperties.UniformBlock);
+		glGetActiveUniformBlockiv(context->MainShader, uniformBlockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &uniformBlockSize);
+		glBindBuffer(GL_UNIFORM_BUFFER, context->MainShaderProperties.UniformBlock);
 		glBufferData(GL_UNIFORM_BUFFER, uniformBlockSize, nullptr, GL_DYNAMIC_DRAW);
 	}
 
@@ -284,12 +288,12 @@ void InitRenderContext(GLFWwindow *window, RenderContext **context) {
 	#ifdef _DEBUG
 		{
 			GLint debugNumUniforms = 0;
-			glGetProgramiv(newContext->MainShader, GL_ACTIVE_UNIFORMS, &debugNumUniforms);
+			glGetProgramiv(context->MainShader, GL_ACTIVE_UNIFORMS, &debugNumUniforms);
 			for (GLint i = 0; i < debugNumUniforms; ++i) {
 				GLchar name[1024];
 				GLsizei size = 0;
 				GLenum type = GL_NONE;
-				glGetActiveUniform(newContext->MainShader, i, sizeof(name), nullptr, &size, &type, name);
+				glGetActiveUniform(context->MainShader, i, sizeof(name), nullptr, &size, &type, name);
 				std::cout << "Uniform #" << i << ": " << name << "\n";
 			}
 			assert(debugNumUniforms >= numBlockUniforms);
@@ -298,17 +302,17 @@ void InitRenderContext(GLFWwindow *window, RenderContext **context) {
 
 	// Map uniform names to indices within the block
 	GLuint uniformIndex[numBlockUniforms];
-	glGetUniformIndices(newContext->MainShader, numBlockUniforms, uniformName, uniformIndex);
+	glGetUniformIndices(context->MainShader, numBlockUniforms, uniformName, uniformIndex);
 	assert(uniformIndex[0] < 10000);
 
 	// Map indices to byte offsets
-	newContext->MainShaderProperties.UniformOffset = new GLint[numBlockUniforms];
-	glGetActiveUniformsiv(newContext->MainShader, numBlockUniforms, uniformIndex, GL_UNIFORM_OFFSET, newContext->MainShaderProperties.UniformOffset);
-	assert(newContext->MainShaderProperties.UniformOffset[0] >= 0);
+	context->MainShaderProperties.UniformOffset = new GLint[numBlockUniforms];
+	glGetActiveUniformsiv(context->MainShader, numBlockUniforms, uniformIndex, GL_UNIFORM_OFFSET, context->MainShaderProperties.UniformOffset);
+	assert(context->MainShaderProperties.UniformOffset[0] >= 0);
 
 	// Create the main VAO and bind the buffers to it
-	glGenVertexArrays(1, &newContext->MainVAO);
-	glBindVertexArray(newContext->MainVAO);
+	glGenVertexArrays(1, &context->MainVAO);
+	glBindVertexArray(context->MainVAO);
 
 	// in position
 	glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
@@ -343,14 +347,14 @@ void InitRenderContext(GLFWwindow *window, RenderContext **context) {
 	// Load the sky shader
 	GLuint skyVertexShader = compileShader(GL_VERTEX_SHADER, loadTextFile("sky_vs.glsl"));
 	GLuint skyPixelShader = compileShader(GL_FRAGMENT_SHADER, loadTextFile("sky_ps.glsl"));
-	newContext->SkyShader = createShaderProgram(skyVertexShader, skyPixelShader);
+	context->SkyShader = createShaderProgram(skyVertexShader, skyPixelShader);
 
-	newContext->SkyShaderProperties.LightUniform = glGetUniformLocation(newContext->SkyShader, "light");
-	newContext->SkyShaderProperties.ResolutionUniform = glGetUniformLocation(newContext->SkyShader, "resolution");
-	newContext->SkyShaderProperties.WorldMatrixUniform = glGetUniformLocation(newContext->SkyShader, "worldMatrix");
-	newContext->SkyShaderProperties.InvProjectionMatrixUniform = glGetUniformLocation(newContext->SkyShader, "invProjectionMatrix");
+	context->SkyShaderProperties.LightUniform = glGetUniformLocation(context->SkyShader, "light");
+	context->SkyShaderProperties.ResolutionUniform = glGetUniformLocation(context->SkyShader, "resolution");
+	context->SkyShaderProperties.WorldMatrixUniform = glGetUniformLocation(context->SkyShader, "worldMatrix");
+	context->SkyShaderProperties.InvProjectionMatrixUniform = glGetUniformLocation(context->SkyShader, "invProjectionMatrix");
 
-	glGenVertexArrays(1, &newContext->SkyVAO);
+	glGenVertexArrays(1, &context->SkyVAO);
 
 	// Load a texture map
 	{
@@ -362,8 +366,8 @@ void InitRenderContext(GLFWwindow *window, RenderContext **context) {
 			std::exit(1);
 		}
 
-		glGenTextures(1, &newContext->MainShaderProperties.ColorTexture);
-		glBindTexture(GL_TEXTURE_2D, newContext->MainShaderProperties.ColorTexture);
+		glGenTextures(1, &context->MainShaderProperties.ColorTexture);
+		glBindTexture(GL_TEXTURE_2D, context->MainShaderProperties.ColorTexture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, textureWidth, textureHeight, 0, (channels == 3) ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -371,26 +375,25 @@ void InitRenderContext(GLFWwindow *window, RenderContext **context) {
 	}
 
 	{
-		glGenSamplers(1, &newContext->MainShaderProperties.TrilinearSampler);
-		glSamplerParameteri(newContext->MainShaderProperties.TrilinearSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(newContext->MainShaderProperties.TrilinearSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(newContext->MainShaderProperties.TrilinearSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(newContext->MainShaderProperties.TrilinearSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glGenSamplers(1, &context->MainShaderProperties.TrilinearSampler);
+		glSamplerParameteri(context->MainShaderProperties.TrilinearSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(context->MainShaderProperties.TrilinearSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(context->MainShaderProperties.TrilinearSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(context->MainShaderProperties.TrilinearSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
 }
 
 void ShutdownRenderContext(RenderContext *context) {
 	delete context->MainShaderProperties.UniformOffset;
-	delete context;
 }
 
-void RenderFrame(GLFWwindow *window, RenderContext *context, double deltaTime) {
+void RenderFrame(GLFWwindow *window, RenderContext *context) {
 	GLenum error = glGetError();
 	assert(error == GL_NONE);
 
 	const float nearPlaneZ = 0.1f;
 	const float farPlaneZ = 100.0f;
-	const float verticalFieldOfView = 45.0f * M_PI / 180.0f;
+	const float verticalFieldOfView = 45.0f * (float)M_PI / 180.0f;
 	const glm::vec3 cameraPosition(3, 3, 5);
 
 	glm::mat4x4 worldMatrix, viewMatrix, projectionMatrix;
@@ -459,4 +462,38 @@ void RenderFrame(GLFWwindow *window, RenderContext *context, double deltaTime) {
 
 	// Display what has been drawn on the main window
 	glfwSwapBuffers(window);
+}
+
+
+FTL_THREAD_FUNC_DECL RenderThreadStart(void *arg) {
+	rmt_SetCurrentThreadName("Render");
+
+	ThreadArgs *renderArgs = (ThreadArgs *)arg;
+	GLFWwindow *window = renderArgs->Window;
+	GameSyncState *syncState = renderArgs->SyncState;
+	delete renderArgs;
+	
+	// Bind ourselves to the last hardware thread
+	// Logic will use [0, NumHardwareThreads() - 1)
+	FiberTaskingLib::SetCurrentThreadAffinity(FiberTaskingLib::GetNumHardwareThreads() - 1);
+
+	RenderContext *renderContext = new RenderContext();
+	InitRenderContext(window, renderContext);
+
+
+	uint64 lastSceneRendered = 0;
+
+	while (!syncState->ShouldQuit.load(std::memory_order_relaxed)) {
+		rmt_ScopedCPUSample(RenderLoop, 0);
+
+		rmt_BeginCPUSample(WaitForNewScene, 0);
+		uint64 sceneToRender = syncState->SceneQueue.Pop();
+		rmt_EndCPUSample();
+
+		rmt_BeginCPUSample(DrawFrame, 0);
+		RenderFrame(window, renderContext);
+		rmt_EndCPUSample();
+	}
+
+	return 0;
 }
